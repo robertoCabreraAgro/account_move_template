@@ -17,17 +17,12 @@ class AccountMoveTemplateLine(models.Model):
     sequence = fields.Integer(required=True)
     company_id = fields.Many2one(
         comodel_name="res.company",
-        string="Companies",
+        string="Company",
     )
     partner_id = fields.Many2one(
         comodel_name="res.partner",
         string="Partner",
         domain=["|", ("parent_id", "=", False), ("is_company", "=", True)],
-    )
-    account_prefix = fields.Char(
-        string="Accounts Prefix",
-        help="When creating a new journal item an account having this prefix"
-        "will be looked for",
     )
     account_id = fields.Many2one(
         comodel_name="account.account",
@@ -36,11 +31,21 @@ class AccountMoveTemplateLine(models.Model):
         check_company=True,
         domain=[("deprecated", "=", False), ("account_type", "!=", "off_balance")],
     )
+    opt_account_id = fields.Many2one(
+        comodel_name="account.account",
+        string="Account if Negative",
+        help="When amount is negative, use this account instead",
+        check_company=True,
+        domain=[("deprecated", "=", False), ("account_type", "!=", "off_balance")],
+    )
+    account_prefix = fields.Char(
+        string="Account Prefix",
+        help="When creating a new journal item, an account having this prefix will be looked for",
+    )
     product_id = fields.Many2one(
         comodel_name="product.product",
         check_company=True,
     )
-
     product_uom_id = fields.Many2one(
         comodel_name="uom.uom",
         string="Unit of Measure",
@@ -52,6 +57,11 @@ class AccountMoveTemplateLine(models.Model):
     quantity = fields.Float(
         string="Quantity",
         digits="Product Unit of Measure",
+    )
+    product_uom_qty = fields.Float(
+        string="Product Quantity",
+        digits="Product Unit of Measure",
+        default=1.0,
     )
     price_unit = fields.Float(
         string="Unit Price",
@@ -66,6 +76,15 @@ class AccountMoveTemplateLine(models.Model):
         comodel_name="account.tax",
         string="Taxes",
         check_company=True,
+    )
+    tax_line_id = fields.Many2one(
+        "account.tax", 
+        string="Originator Tax", 
+        ondelete="restrict"
+    )
+    tax_repartition_line_id = fields.Many2one(
+        "account.tax.repartition.line",
+        string="Tax Repartition Line",
     )
     move_line_type = fields.Selection(
         [("cr", "Credit"), ("dr", "Debit")],
@@ -82,6 +101,12 @@ class AccountMoveTemplateLine(models.Model):
     )
     python_code = fields.Text(string="Formula")
     note = fields.Char()
+    payment_term_id = fields.Many2one(
+        "account.payment.term", 
+        string="Payment Terms",
+        help="Used to compute the due date of the journal item."
+    )
+    is_refund = fields.Boolean(string="Is a refund?")
 
     _sequence_template_uniq = models.Constraint(
         "UNIQUE(template_id, sequence)",
@@ -112,24 +137,24 @@ class AccountMoveTemplateLine(models.Model):
             copy_vals.pop(key)
         return copy_vals
 
-    def _prepare_wizard_line_vals(self, overwrite_vals):
+    def _prepare_wizard_line_vals(self, overwrite_vals=None):
         vals = {
-            "line_id": self.id,
-            "partner_id": self.partner_id.id or False,
-            "product_id": self.product_id.id or False,
-            "product_uom_id": self.product_uom_id.id
-            or self.product_id.uom_id.id
-            or False,
-            "product_uom_qty": self.product_uom_qty or 1.0,
+            "sequence": self.sequence,
             "name": self.name,
+            "partner_id": self.partner_id.id or False,
             "account_id": self.account_id.id,
+            "move_line_type": self.move_line_type,
             "amount": self.amount,
-            "tax_ids": [Command.set(self.tax_ids.ids)],
+            "tax_ids": [(6, 0, self.tax_ids.ids)] if self.tax_ids else False,
+            "tax_line_id": self.tax_line_id.id or False,
             "type": self.type,
+            "note": self.note,
+            "payment_term_id": self.payment_term_id.id or False,
         }
         if overwrite_vals:
             safe_overwrite_vals = self._safe_overwrite_vals(
-                self._name, overwrite_vals.get("L{}".format(self.sequence), {})
+                "account.move.template.line.run", 
+                overwrite_vals.get("L{}".format(self.sequence), {})
             )
             vals.update(safe_overwrite_vals)
         return vals

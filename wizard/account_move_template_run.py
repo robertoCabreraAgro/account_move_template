@@ -21,8 +21,8 @@ class AccountMoveTemplateRun(models.TransientModel):
     )
     journal_id = fields.Many2one(
         comodel_name="account.journal",
-        string="Prefix",
-        readonly=True,
+        string="Journal",
+        readonly=False,
     )
     partner_id = fields.Many2one(
         comodel_name="res.partner",
@@ -51,8 +51,6 @@ class AccountMoveTemplateRun(models.TransientModel):
         inverse_name="wizard_id",
         string="Lines",
     )
-    use_journal = fields.Boolean(default=False)
-    use_partner = fields.Boolean(default=False)
 
     # STEP 1
     def load_lines(self):
@@ -67,7 +65,15 @@ class AccountMoveTemplateRun(models.TransientModel):
             amtlro.create(vals)
 
         # Determinar un journal válido
-        journal = template.journal_id or template.suitable_journal_ids[:1]
+        journal = template.journal_id
+        if not journal and hasattr(template, 'suitable_journal_ids') and template.suitable_journal_ids:
+            journal = template.suitable_journal_ids[0]
+            
+        if not journal:
+            # Buscar un diario general compatible
+            domain = [('company_id', '=', self.company_id.id), ('type', '=', 'general')]
+            journal = self.env['account.journal'].search(domain, limit=1)
+            
         if not journal:
             raise UserError(_("No journal available for this template."))
 
@@ -112,6 +118,9 @@ class AccountMoveTemplateRun(models.TransientModel):
                     Command.create(self._prepare_move_line(line, amount))
                 )
 
+        if not move_vals.get("line_ids"):
+            raise UserError(_("Debit and credit of all lines are null."))
+
         move = self.env["account.move"].create(move_vals)
         result = self.env["ir.actions.actions"]._for_xml_id(
             "account.action_move_journal_line"
@@ -121,7 +130,7 @@ class AccountMoveTemplateRun(models.TransientModel):
             "res_id": move.id,
             "views": False,
             "view_id": False,
-            "view_mode": "form,list,kanban",
+            "view_mode": "form,tree",
             "context": self.env.context,
         })
         return result
@@ -194,7 +203,7 @@ class AccountMoveTemplateRun(models.TransientModel):
             "move_line_type": tmpl_line.move_line_type,
             "tax_ids": [Command.set(tmpl_line.tax_ids.ids)],
             "note": tmpl_line.note,
-            # "payment_term_id": tmpl_line.payment_term_id.id or False,
+            "payment_term_id": tmpl_line.payment_term_id.id if hasattr(tmpl_line, 'payment_term_id') else False,
         }
         return vals
 
@@ -210,7 +219,7 @@ class AccountMoveTemplateRun(models.TransientModel):
 
     def _prepare_move_line(self, line, amount):
         date_maturity = False
-        if line.payment_term_id:
+        if hasattr(line, 'payment_term_id') and line.payment_term_id:
             pterm_list = line.payment_term_id.compute(value=1, date_ref=self.date)
             date_maturity = max(line[0] for line in pterm_list)
         debit = line.move_line_type == "dr"
@@ -221,20 +230,21 @@ class AccountMoveTemplateRun(models.TransientModel):
             "debit": debit and amount or 0.0,
             "partner_id": self.partner_id.id or line.partner_id.id,
             "date_maturity": date_maturity or self.date,
-            "tax_repartition_line_id": line.tax_repartition_line_id.id or False,
-            "analytic_distribution": line.analytic_distribution,
+            "tax_repartition_line_id": line.tax_repartition_line_id.id or False if hasattr(line, 'tax_repartition_line_id') else False,
+            "analytic_distribution": line.analytic_distribution if hasattr(line, 'analytic_distribution') else False,
         }
         if line.tax_ids:
             values["tax_ids"] = [Command.set(line.tax_ids.ids)]
-            tax_repartition = "refund_tax_id" if line.is_refund else "invoice_tax_id"
-            atrl_ids = self.env["account.tax.repartition.line"].search(
-                [
-                    (tax_repartition, "in", line.tax_ids.ids),
-                    ("repartition_type", "=", "base"),
-                ]
-            )
-            values["tax_tag_ids"] = [Command.set(atrl_ids.mapped("tag_ids").ids)]
-        if line.tax_repartition_line_id:
+            if hasattr(line, 'is_refund'):
+                tax_repartition = "refund_tax_id" if line.is_refund else "invoice_tax_id"
+                atrl_ids = self.env["account.tax.repartition.line"].search(
+                    [
+                        (tax_repartition, "in", line.tax_ids.ids),
+                        ("repartition_type", "=", "base"),
+                    ]
+                )
+                values["tax_tag_ids"] = [Command.set(atrl_ids.mapped("tag_ids").ids)]
+        if hasattr(line, 'tax_repartition_line_id') and line.tax_repartition_line_id:
             values["tax_tag_ids"] = [
                 Command.set(line.tax_repartition_line_id.tag_ids.ids)
             ]
@@ -257,7 +267,7 @@ class AccountMoveTemplateRun(models.TransientModel):
         return copy_vals
 
     def _update_account_on_negative(self, line, vals):
-        if not line.opt_account_id:
+        if not hasattr(line, 'opt_account_id') or not line.opt_account_id:
             return
         for key in ["debit", "credit"]:
             if vals[key] < 0:

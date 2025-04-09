@@ -7,15 +7,14 @@ _logger = logging.getLogger(__name__)
 class AccountMoveTemplate(models.Model):
     _inherit = 'account.move.template'
     
-    # Reemplazamos company_id por company_ids para mantener compatibilidad
-    # con la definición original en account_move_template
+    # Convertir company_id a many2many para soportar múltiples compañías
     company_ids = fields.Many2many(
         'res.company',
         string='Companies',
         default=lambda self: self.env.company,
     )
     
-    # Campo calculado para mostrar en la interfaz
+    # Campo calculado para compatibilidad con vistas existentes
     company_id = fields.Many2one(
         'res.company',
         string='Primary Company',
@@ -27,6 +26,32 @@ class AccountMoveTemplate(models.Model):
         'account.workflow.template.line',
         'template_id',
         string='Used in Workflows'
+    )
+    
+    move_type = fields.Selection([
+        ('entry', 'Journal Entry'),
+        ('out_invoice', 'Customer Invoice'),
+        ('out_refund', 'Customer Credit Note'),
+        ('in_invoice', 'Vendor Bill'),
+        ('in_refund', 'Vendor Credit Note'),
+    ], default='entry', required=True)
+    
+    partner_id = fields.Many2one(
+        'res.partner',
+        string='Default Partner',
+        help='Default partner for this template'
+    )
+    
+    date = fields.Date(
+        string='Default Date',
+        help='Default date for entries created from this template'
+    )
+    
+    suitable_journal_ids = fields.Many2many(
+        'account.journal',
+        string='Suitable Journals',
+        domain="[('company_id', 'in', company_ids)]",
+        help='Journals that can be used with this template'
     )
     
     @api.depends('company_ids')
