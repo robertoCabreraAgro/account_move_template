@@ -1,33 +1,30 @@
+# models/account_move_template.py
 from odoo import api, fields, models, _
-from itertools import chain
-import logging
-
-_logger = logging.getLogger(__name__)
+from odoo.exceptions import UserError
+from odoo.tools.safe_eval import safe_eval
 
 class AccountMoveTemplate(models.Model):
-    _inherit = 'account.move.template'
-    
-    # Convertir company_id a many2many para soportar múltiples compañías
-    company_ids = fields.Many2many(
-        'res.company',
-        string='Companies',
-        default=lambda self: self.env.company,
-    )
-    
-    # Campo calculado para compatibilidad con vistas existentes
+    _name = "account.move.template"
+    _description = "Journal Entry Template"
+
+    name = fields.Char(required=True)
     company_id = fields.Many2one(
         'res.company',
-        string='Primary Company',
-        compute='_compute_primary_company',
-        store=True,
+        string='Company',
+        default=lambda self: self.env.company,
+        required=True
     )
-    
-    workflow_line_ids = fields.One2many(
-        'account.workflow.template.line',
-        'template_id',
-        string='Used in Workflows'
+    journal_id = fields.Many2one(
+        'account.journal',
+        string='Journal',
     )
-    
+    ref = fields.Char(string="Reference")
+    line_ids = fields.One2many(
+        "account.move.template.line", 
+        "template_id", 
+        string="Lines"
+    )
+    active = fields.Boolean(default=True)
     move_type = fields.Selection([
         ('entry', 'Journal Entry'),
         ('out_invoice', 'Customer Invoice'),
@@ -35,57 +32,74 @@ class AccountMoveTemplate(models.Model):
         ('in_invoice', 'Vendor Bill'),
         ('in_refund', 'Vendor Credit Note'),
     ], default='entry', required=True)
-    
     partner_id = fields.Many2one(
         'res.partner',
         string='Default Partner',
-        help='Default partner for this template'
     )
-    
     date = fields.Date(
         string='Default Date',
-        help='Default date for entries created from this template'
     )
     
-    suitable_journal_ids = fields.Many2many(
-        'account.journal',
-        string='Suitable Journals',
-        domain="[('company_id', 'in', company_ids)]",
-        help='Journals that can be used with this template'
-    )
+    _sql_constraints = [
+        (
+            "name_company_unique",
+            "unique(name, company_id)",
+            "This name is already used by another template!",
+        ),
+    ]
     
-    @api.depends('company_ids')
-    def _compute_primary_company(self):
-        """Computes a single company for compatibility with views"""
-        for template in self:
-            template.company_id = template.company_ids[:1] if template.company_ids else self.env.company
-    
-    def _compute_workflow_count(self):
-        """Compute the number of workflows this template is used in"""
-        for template in self:
-            template.workflow_count = len(template.workflow_line_ids)
-    
-    workflow_count = fields.Integer(
-        string='# Workflows',
-        compute='_compute_workflow_count'
-    )
-    
-    def action_view_workflows(self):
-        """View workflows where this template is used"""
+    def copy(self, default=None):
         self.ensure_one()
-        workflows = self.workflow_line_ids.mapped('workflow_id')
-        if not workflows:
-            return {
-                'type': 'ir.actions.act_window_close'
-            }
-            
-        action = self.env.ref('account_move_workflow.action_account_move_workflow').read()[0]
+        default = dict(default or {})
+        default.update(name=_("%s (copy)") % self.name)
+        return super().copy(default)
+    
+    def action_move_template_run(self):
+        self.ensure_one()
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Create Entry from Template"),
+            "res_model": "account.move.template.run",
+            "view_mode": "form",
+            "target": "new",
+            "context": {
+                "default_template_id": self.id,
+                "default_company_id": self.company_id.id,
+            },
+        }
         
-        workflow_ids = workflows.ids
-        if len(workflow_ids) == 1:
-            action['views'] = [(self.env.ref('account_move_workflow.view_account_move_workflow_form').id, 'form')]
-            action['res_id'] = workflow_ids[0]
-        else: 
-            action['domain'] = [('id', 'in', workflow_ids)]
-            
-        return action
+    def compute_lines(self, vals):
+        for tmpl in self:
+            for line in tmpl.line_ids.filtered(lambda l: l.type == "computed"):
+                sequence = line.sequence
+                seq_ref = f"L{sequence}"
+                eval_context = {key: vals[key] for key in vals}
+                for seq in range(sequence):
+                    seq_str = f"L{seq}"
+                    if seq_str in eval_context:
+                        continue
+                    line_tmpl = tmpl.line_ids.filtered(lambda l: l.sequence == seq)
+                    if line_tmpl:
+                        eval_context[seq_str] = vals[seq]
+                try:
+                    vals[sequence] = safe_eval(line.python_code, eval_context)
+                except Exception as e:
+                    if "unexpected EOF" in str(e):
+                        raise UserError(
+                            _(
+                                "Impossible to compute the formula of line with sequence %(sequence)s "
+                                "(formula: %(code)s). Check that the lines used in the formula "
+                                "really exists and have a lower sequence than the current line.",
+                                sequence=sequence,
+                                code=line.python_code,
+                            )
+                        )
+                    else:
+                        raise UserError(
+                            _(
+                                "Impossible to compute the formula of line with sequence %(sequence)s "
+                                "(formula: %(code)s): the syntax of the formula is wrong.",
+                                sequence=sequence,
+                                code=line.python_code,
+                            )
+                        )
