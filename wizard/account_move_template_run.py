@@ -140,7 +140,7 @@ class AccountMoveTemplateRun(models.TransientModel):
             "res_id": move.id,
             "views": False,
             "view_id": False,
-            "view_mode": "form,tree",
+            "view_mode": "form,list",
             "context": self.env.context,
         })
         return result

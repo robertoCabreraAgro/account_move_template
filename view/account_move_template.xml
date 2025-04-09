@@ -78,11 +78,7 @@
                                     <field name="quantity"
                                         string="Qty"
                                         column_invisible="parent.move_type == 'entry'" />
-                                    <field name="discount"
-                                        string="Qty"
-                                        column_invisible="parent.move_type == 'entry'" />
                                     <field name="account_id" />
-                                    <field name="account_prefix" />
                                     <field name="name" />
                                     <field name="amount" />
                                     <field name="move_line_type" />
@@ -104,13 +100,9 @@
                                                 <field name="quantity"
                                                     string="Qty"
                                                     invisible="parent.move_type == 'entry'" />
-                                                <field name="discount"
-                                                    string="Discount"
-                                                    invisible="parent.move_type == 'entry'" />
                                                 <field name="name" />
                                                 <field name="amount" />
                                                 <field name="account_id" />
-                                               <field name="account_prefix" />
                                                 <field name="tax_ids" widget="many2many_tags" />
                                             </group>
                                             <group name="main-right">
