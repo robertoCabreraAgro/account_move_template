@@ -52,6 +52,7 @@ class AccountMoveTemplateRun(models.TransientModel):
         string="Lines",
     )
 
+
     def load_lines(self):
         self.ensure_one()
         overwrite_vals = self._get_overwrite_vals()
@@ -127,9 +128,6 @@ class AccountMoveTemplateRun(models.TransientModel):
                 move_vals["line_ids"].append(
                     Command.create(self._prepare_move_line(line, amount))
                 )
-
-        if not move_vals.get("line_ids"):
-            raise UserError(_("Debit and credit of all lines are null."))
 
         move = self.env["account.move"].create(move_vals)
         result = self.env["ir.actions.actions"]._for_xml_id(
@@ -300,3 +298,7 @@ class AccountMoveTemplateLineRun(models.TransientModel):
     note = fields.Char(readonly=True)
     is_refund = fields.Boolean(string="Is a refund?", readonly=True)
     analytic_distribution = fields.Json('Analytic')
+    analytic_precision = fields.Integer(
+        store=False,
+        default=lambda self: self.env['decimal.precision'].precision_get("Percentage Analytic"),
+    )
