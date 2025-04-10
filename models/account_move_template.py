@@ -65,6 +65,10 @@ class AccountMoveTemplate(models.Model):
             "context": {
                 "default_template_id": self.id,
                 "default_company_id": self.company_id.id,
+                "default_journal_id":self.journal_id.id,
+                "default_partner_id":self.partner_id.id,
+                "default_move_type":self.move_type,
+                "default_ref":self.ref,
             },
         }
         

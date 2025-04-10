@@ -26,18 +26,14 @@ class AccountMoveTemplateRun(models.TransientModel):
     )
     partner_id = fields.Many2one(
         comodel_name="res.partner",
-        string="Override Partner",
+        string="Partner",
         domain=["|", ("parent_id", "=", False), ("is_company", "=", True)],
     )
     date = fields.Date(
         required=True,
         default=fields.Date.context_today,
     )
-    state = fields.Selection(
-        [("select_template", "Select Template"), ("set_lines", "Set Lines")],
-        readonly=True,
-        default="select_template",
-    )
+  
     ref = fields.Char(string="Reference")
     overwrite = fields.Text(
         help="""
@@ -51,7 +47,14 @@ class AccountMoveTemplateRun(models.TransientModel):
         inverse_name="wizard_id",
         string="Lines",
     )
-
+    move_type = fields.Selection([
+        ('entry', 'Journal Entry'),
+        ('out_invoice', 'Customer Invoice'),
+        ('out_refund', 'Customer Credit Note'),
+        ('in_invoice', 'Vendor Bill'),
+        ('in_refund', 'Vendor Credit Note'),
+    ], default='entry', required=True)
+    
 
     def load_lines(self):
         self.ensure_one()
@@ -85,7 +88,6 @@ class AccountMoveTemplateRun(models.TransientModel):
         self.write({
             'journal_id': journal.id,
             "ref": template.ref,
-            "state": "set_lines",
         })
 
         if not self.line_ids:
@@ -108,12 +110,16 @@ class AccountMoveTemplateRun(models.TransientModel):
 
     def generate_move(self):
         self.ensure_one()
-        sequence2amount = {}
-        for wizard_line in self.line_ids:
-            sequence2amount[wizard_line.sequence] = wizard_line.amount
+        
+        # Mapeo de secuencia → monto ingresado por el usuario
+        sequence2amount = {
+            wizard_line.sequence: wizard_line.amount
+            for wizard_line in self.line_ids
+        }
 
         company_cur = self.company_id.currency_id
         self.template_id.compute_lines(sequence2amount)
+
         move_vals = {
             "ref": self.ref,
             "journal_id": self.journal_id.id,
@@ -123,13 +129,14 @@ class AccountMoveTemplateRun(models.TransientModel):
         }
 
         for line in self.template_id.line_ids:
-            amount = sequence2amount[line.sequence]
+            amount = sequence2amount.get(line.sequence, 0.0)
             if not company_cur.is_zero(amount):
                 move_vals["line_ids"].append(
                     Command.create(self._prepare_move_line(line, amount))
                 )
 
         move = self.env["account.move"].create(move_vals)
+
         result = self.env["ir.actions.actions"]._for_xml_id(
             "account.action_move_journal_line"
         )
@@ -142,6 +149,7 @@ class AccountMoveTemplateRun(models.TransientModel):
             "context": self.env.context,
         })
         return result
+
 
     def _get_valid_keys(self):
         return ["partner_id", "amount", "name", "date_maturity"]
