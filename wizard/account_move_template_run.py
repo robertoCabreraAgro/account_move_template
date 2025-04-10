@@ -268,9 +268,12 @@ class AccountMoveTemplateRun(models.TransientModel):
                 vals[key] = 0
 
 
+# Modificaciones en la clase AccountMoveTemplateLineRun en wizard/account_move_template_run.py
+
 class AccountMoveTemplateLineRun(models.TransientModel):
     _name = "account.move.template.line.run"
     _description = "Wizard Lines to generate move from template"
+    _order = "sequence, id"  # Añadir orden para asegurar cálculos ordenados
 
     wizard_id = fields.Many2one(
         comodel_name="account.move.template.run",
@@ -280,7 +283,7 @@ class AccountMoveTemplateLineRun(models.TransientModel):
     company_currency_id = fields.Many2one(
         related="wizard_id.company_id.currency_id", string="Company Currency"
     )
-    name = fields.Char(readonly=True)
+    name = fields.Char()  # Eliminar readonly para permitir edición
     sequence = fields.Integer(required=True)
     move_line_type = fields.Selection(
         [("cr", "Credit"), ("dr", "Debit")],
@@ -288,11 +291,11 @@ class AccountMoveTemplateLineRun(models.TransientModel):
         readonly=True,
         string="Direction",
     )
-    partner_id = fields.Many2one("res.partner", readonly=True, string="Partner")
+    partner_id = fields.Many2one("res.partner", string="Partner")  # Eliminar readonly
     payment_term_id = fields.Many2one(
-        "account.payment.term", string="Payment Terms", readonly=True
+        "account.payment.term", string="Payment Terms"
     )
-    account_id = fields.Many2one("account.account", required=True, readonly=True)
+    account_id = fields.Many2one("account.account", required=True)  # Eliminar readonly
     tax_ids = fields.Many2many("account.tax", string="Taxes", readonly=True)
     tax_line_id = fields.Many2one(
         "account.tax", string="Originator Tax", ondelete="restrict", readonly=True
@@ -303,10 +306,20 @@ class AccountMoveTemplateLineRun(models.TransientModel):
         readonly=True,
     )
     amount = fields.Monetary(required=True, currency_field="company_currency_id")
-    note = fields.Char(readonly=True)
+    note = fields.Char()
     is_refund = fields.Boolean(string="Is a refund?", readonly=True)
     analytic_distribution = fields.Json('Analytic')
     analytic_precision = fields.Integer(
         store=False,
         default=lambda self: self.env['decimal.precision'].precision_get("Percentage Analytic"),
     )
+    # Nuevos campos para gestionar el cálculo
+    template_type = fields.Selection(
+        [
+            ("input", "User input"),
+            ("computed", "Computed"),
+        ],
+        string="Template Type",
+        readonly=True,
+    )
+    python_code = fields.Text(string="Formula", readonly=True)
