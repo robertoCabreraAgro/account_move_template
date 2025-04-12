@@ -56,6 +56,11 @@ class AccountMoveTemplateRun(models.TransientModel):
         ('in_invoice', 'Vendor Bill'),
         ('in_refund', 'Vendor Credit Note'),
     ], default='entry', required=True)
+    
+    price_unit = fields.Float(
+        string='Amount',
+        help='amount allowed for this template'
+    )
    
     def load_lines(self):
         self.ensure_one()

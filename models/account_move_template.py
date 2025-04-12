@@ -39,7 +39,10 @@ class AccountMoveTemplate(models.Model):
     date = fields.Date(
         string='Default Date',
     )
-    
+    price_unit = fields.Float(
+        string='Amount',
+        help='amount allowed for this template'
+    )
     _sql_constraints = [
         (
             "name_company_unique",
