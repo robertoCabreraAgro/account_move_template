@@ -56,7 +56,6 @@ class AccountMoveTemplateRun(models.TransientModel):
         ('in_invoice', 'Vendor Bill'),
         ('in_refund', 'Vendor Credit Note'),
     ], default='entry', required=True)
-    
     price_unit = fields.Float(
         string='Unit Price',
         help='Price per unit to be transferred to the generated move lines'
@@ -158,6 +157,10 @@ class AccountMoveTemplateRun(models.TransientModel):
                     amount = safe_eval(line.python_code, eval_context)
                     line.amount = amount
                     sequence2amount[sequence] = amount
+                    
+                    # Asegurar que el price_unit se mantiene incluso en líneas computadas
+                    if hasattr(self, 'price_unit') and self.price_unit:
+                        line.price_unit = self.price_unit
             except Exception as e:
                 # Manejar excepciones elegantemente
                 _logger.error("Error al calcular línea %s: %s", line.sequence, str(e))
@@ -197,6 +200,12 @@ class AccountMoveTemplateRun(models.TransientModel):
                 )
 
         move = self.env["account.move"].create(move_vals)
+        
+        # Aquí asignamos directamente el price_unit a todas las líneas
+        # Esto asegura que incluso si no se pasa en _prepare_move_line, se asigna después
+        if hasattr(self, 'price_unit') and self.price_unit:
+            for move_line in move.line_ids:
+                move_line.price_unit = self.price_unit
 
         result = self.env["ir.actions.actions"]._for_xml_id(
             "account.action_move_journal_line"
@@ -210,7 +219,6 @@ class AccountMoveTemplateRun(models.TransientModel):
             "context": self.env.context,
         })
         return result
-
 
     def _get_valid_keys(self):
         return ["partner_id", "amount", "name", "date_maturity", "price_unit"]
@@ -274,7 +282,8 @@ class AccountMoveTemplateRun(models.TransientModel):
             "move_line_type": tmpl_line.move_line_type,
             "tax_ids": [Command.set(tmpl_line.tax_ids.ids)],
             "note": tmpl_line.note,
-            "price_unit": self.price_unit if hasattr(self, 'price_unit') else 0.0,
+            # Asegurar que price_unit se asigna a las líneas del wizard
+            "price_unit": self.price_unit if hasattr(self, 'price_unit') and self.price_unit else 0.0,
         }
         return vals
 
@@ -287,6 +296,26 @@ class AccountMoveTemplateRun(models.TransientModel):
             "line_ids": [],
         }
         return move_vals
+
+    def _safe_vals(self, model, vals):
+        obj = self.env[model]
+        copy_vals = vals.copy()
+        invalid_keys = list(
+            set(list(vals.keys())) - set(list(dict(obj._fields).keys()))
+        )
+        for key in invalid_keys:
+            copy_vals.pop(key)
+        return copy_vals
+    
+    def _update_account_on_negative(self, line, vals):
+        if not hasattr(line, 'opt_account_id') or not line.opt_account_id:
+            return
+        for key in ["debit", "credit"]:
+            if vals[key] < 0:
+                ikey = "credit" if key == "debit" else "debit"
+                vals["account_id"] = line.opt_account_id.id
+                vals[ikey] = abs(vals[key])
+                vals[key] = 0
 
     def _prepare_move_line(self, line, amount):
         """Preparar valores para línea del asiento desde la línea del wizard"""
@@ -304,7 +333,13 @@ class AccountMoveTemplateRun(models.TransientModel):
             "partner_id": line.partner_id.id or self.partner_id.id,
             "date_maturity": date_maturity or self.date,
         }
-
+        
+        # Transferir el price_unit si existe en la línea del wizard
+        if hasattr(line, 'price_unit') and line.price_unit:
+            values["price_unit"] = line.price_unit
+        elif hasattr(self, 'price_unit') and self.price_unit:
+            values["price_unit"] = self.price_unit
+        
         if line.tax_ids:
             values["tax_ids"] = [Command.set(line.tax_ids.ids)]
 
@@ -333,27 +368,6 @@ class AccountMoveTemplateRun(models.TransientModel):
 
         self._update_account_on_negative(line, values)
         return values
-
-    def _safe_vals(self, model, vals):
-        obj = self.env[model]
-        copy_vals = vals.copy()
-        invalid_keys = list(
-            set(list(vals.keys())) - set(list(dict(obj._fields).keys()))
-        )
-        for key in invalid_keys:
-            copy_vals.pop(key)
-        return copy_vals
-    
-    def _update_account_on_negative(self, line, vals):
-        if not hasattr(line, 'opt_account_id') or not line.opt_account_id:
-            return
-        for key in ["debit", "credit"]:
-            if vals[key] < 0:
-                ikey = "credit" if key == "debit" else "debit"
-                vals["account_id"] = line.opt_account_id.id
-                vals[ikey] = abs(vals[key])
-                vals[key] = 0
-
 
 class AccountMoveTemplateLineRun(models.TransientModel):
     _name = "account.move.template.line.run"
