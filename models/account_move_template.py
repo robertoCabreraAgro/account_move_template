@@ -9,14 +9,14 @@ class AccountMoveTemplate(models.Model):
 
     name = fields.Char(required=True)
     company_id = fields.Many2one(
-        'res.company',
-        string='Company',
+        "res.company",
+        string="Company",
         default=lambda self: self.env.company,
         required=True
     )
     journal_id = fields.Many2one(
-        'account.journal',
-        string='Journal',
+        "account.journal",
+        string="Journal",
     )
     ref = fields.Char(string="Reference")
     line_ids = fields.One2many(
@@ -26,22 +26,22 @@ class AccountMoveTemplate(models.Model):
     )
     active = fields.Boolean(default=True)
     move_type = fields.Selection([
-        ('entry', 'Journal Entry'),
-        ('out_invoice', 'Customer Invoice'),
-        ('out_refund', 'Customer Credit Note'),
-        ('in_invoice', 'Vendor Bill'),
-        ('in_refund', 'Vendor Credit Note'),
-    ], default='entry', required=True)
+        ("entry", "Journal Entry"),
+        ("out_invoice", "Customer Invoice"),
+        ("out_refund", "Customer Credit Note"),
+        ("in_invoice", "Vendor Bill"),
+        ("in_refund", "Vendor Credit Note"),
+    ], default="entry", required=True)
     partner_id = fields.Many2one(
-        'res.partner',
-        string='Default Partner',
+        "res.partner",
+        string="Default Partner",
     )
     date = fields.Date(
-        string='Default Date',
+        string="Default Date",
     )
-    price_unit = fields.Float(
-        string='Amount',
-        help='amount allowed for this template'
+    allow_account_ids = fields.Many2many(
+        "account.account",
+        compute="compute_allow_account_ids",
     )
     _sql_constraints = [
         (
