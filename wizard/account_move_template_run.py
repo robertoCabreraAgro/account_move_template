@@ -58,8 +58,8 @@ class AccountMoveTemplateRun(models.TransientModel):
     ], default='entry', required=True)
     
     price_unit = fields.Float(
-        string='Amount',
-        help='amount allowed for this template'
+        string='Unit Price',
+        help='Price per unit to be transferred to the generated move lines'
     )
    
     def load_lines(self):
@@ -85,9 +85,9 @@ class AccountMoveTemplateRun(models.TransientModel):
                 "tax_ids": [(6, 0, tmpl_line.tax_ids.ids)],
                 "note": tmpl_line.note,
                 "payment_term_id": tmpl_line.payment_term_id.id if hasattr(tmpl_line, 'payment_term_id') else False,
-                # Guardar el tipo para posteriormente calcular los valores
                 "template_type": tmpl_line.type,
                 "python_code": tmpl_line.python_code if tmpl_line.type == 'computed' else False,
+                "price_unit": self.price_unit if hasattr(self, 'price_unit') else 0.0,
             }
             
             # Si hay distribución analítica, añadirla
@@ -213,7 +213,7 @@ class AccountMoveTemplateRun(models.TransientModel):
 
 
     def _get_valid_keys(self):
-        return ["partner_id", "amount", "name", "date_maturity"]
+        return ["partner_id", "amount", "name", "date_maturity", "price_unit"]
 
     def _get_overwrite_vals(self):
         self.ensure_one()
@@ -243,8 +243,8 @@ class AccountMoveTemplateRun(models.TransientModel):
         except Exception as e:
             msg = """
                 valid_dict = {
-                    'L1': {'partner_id': 1, 'amount': 10},
-                    'L2': {'partner_id': 2, 'amount': 20},
+                    'L1': {'partner_id': 1, 'amount': 10, 'price_unit': 10},
+                    'L2': {'partner_id': 2, 'amount': 20, 'price_unit': 20},
             }
             """
             raise ValidationError(
@@ -274,7 +274,7 @@ class AccountMoveTemplateRun(models.TransientModel):
             "move_line_type": tmpl_line.move_line_type,
             "tax_ids": [Command.set(tmpl_line.tax_ids.ids)],
             "note": tmpl_line.note,
-            # "payment_term_id": tmpl_line.payment_term_id.id or False,
+            "price_unit": self.price_unit if hasattr(self, 'price_unit') else 0.0,
         }
         return vals
 
@@ -291,23 +291,24 @@ class AccountMoveTemplateRun(models.TransientModel):
     def _prepare_move_line(self, line, amount):
         """Preparar valores para línea del asiento desde la línea del wizard"""
         date_maturity = False
-        if line.payment_term_id:
+        if hasattr(line, 'payment_term_id') and line.payment_term_id:
             pterm_list = line.payment_term_id.compute(value=1, date_ref=self.date)
-            date_maturity = max(line[0] for line in pterm_list)
-            
+            date_maturity = max(p[0] for p in pterm_list)
+
         debit = line.move_line_type == "dr"
         values = {
             "name": line.name,
             "account_id": line.account_id.id,
-            "credit": not debit and abs(amount) or 0.0,
-            "debit": debit and abs(amount) or 0.0,
+            "credit": 0.0 if debit else abs(amount),
+            "debit": abs(amount) if debit else 0.0,
             "partner_id": line.partner_id.id or self.partner_id.id,
             "date_maturity": date_maturity or self.date,
-            "tax_repartition_line_id": line.tax_repartition_line_id.id or False,
-            "analytic_distribution": line.analytic_distribution,
         }
+
         if line.tax_ids:
             values["tax_ids"] = [Command.set(line.tax_ids.ids)]
+
+        if getattr(line, 'is_refund', False):
             tax_repartition = "refund_tax_id" if line.is_refund else "invoice_tax_id"
             atrl_ids = self.env["account.tax.repartition.line"].search(
                 [
@@ -315,16 +316,21 @@ class AccountMoveTemplateRun(models.TransientModel):
                     ("repartition_type", "=", "base"),
                 ]
             )
-            values["tax_tag_ids"] = [Command.set(atrl_ids.mapped("tag_ids").ids)]
-        if line.tax_repartition_line_id:
-            values["tax_tag_ids"] = [
-                Command.set(line.tax_repartition_line_id.tag_ids.ids)
-            ]
-        # With overwrite options
+            if atrl_ids:
+                values["tax_tag_ids"] = [Command.set(atrl_ids.mapped("tag_ids").ids)]
+
+        if getattr(line, 'tax_repartition_line_id', False):
+            values["tax_repartition_line_id"] = line.tax_repartition_line_id.id
+            values["tax_tag_ids"] = [Command.set(line.tax_repartition_line_id.tag_ids.ids)]
+
+        if getattr(line, 'analytic_distribution', False):
+            values["analytic_distribution"] = line.analytic_distribution
+
+        # Aplicar sobreescritura desde contexto
         overwrite = self._context.get("overwrite", {})
         move_line_vals = overwrite.get(f"L{line.sequence}", {})
         values.update(move_line_vals)
-        # Use optional account, when amount is negative
+
         self._update_account_on_negative(line, values)
         return values
 
@@ -337,52 +343,7 @@ class AccountMoveTemplateRun(models.TransientModel):
         for key in invalid_keys:
             copy_vals.pop(key)
         return copy_vals
-
-    def _prepare_move_line(self, line, amount):
-        date_maturity = False
-        if hasattr(line, 'payment_term_id') and line.payment_term_id:
-            pterm_list = line.payment_term_id.compute(value=1, date_ref=self.date)
-            date_maturity = max(line[0] for line in pterm_list)
-        debit = line.move_line_type == "dr"
-        values = {
-            "name": line.name,
-            "account_id": line.account_id.id,
-            "credit": not debit and amount or 0.0,
-            "debit": debit and amount or 0.0,
-            "partner_id": self.partner_id.id or line.partner_id.id,
-            "date_maturity": date_maturity or self.date,
-        }
-        
-        # Add optional fields if they exist
-        if hasattr(line, 'tax_repartition_line_id') and line.tax_repartition_line_id:
-            values["tax_repartition_line_id"] = line.tax_repartition_line_id.id
-            
-        if hasattr(line, 'analytic_distribution') and line.analytic_distribution:
-            values["analytic_distribution"] = line.analytic_distribution
-            
-        if line.tax_ids:
-            values["tax_ids"] = [Command.set(line.tax_ids.ids)]
-            
-            if hasattr(line, 'is_refund') and line.is_refund:
-                tax_repartition = "refund_tax_id" if line.is_refund else "invoice_tax_id"
-                atrl_ids = self.env["account.tax.repartition.line"].search(
-                    [
-                        (tax_repartition, "in", line.tax_ids.ids),
-                        ("repartition_type", "=", "base"),
-                    ]
-                )
-                if atrl_ids:
-                    values["tax_tag_ids"] = [Command.set(atrl_ids.mapped("tag_ids").ids)]
-                    
-        # With overwrite options
-        overwrite = self._context.get("overwrite", {})
-        move_line_vals = overwrite.get(f"L{line.sequence}", {})
-        values.update(move_line_vals)
-        
-        # Use optional account when amount is negative
-        self._update_account_on_negative(line, values)
-        return values
-
+    
     def _update_account_on_negative(self, line, vals):
         if not hasattr(line, 'opt_account_id') or not line.opt_account_id:
             return
@@ -451,4 +412,9 @@ class AccountMoveTemplateLineRun(models.TransientModel):
     product_id = fields.Many2one(
         comodel_name="product.product",
         string="Product",
+    )
+
+    price_unit = fields.Float(
+        string='Unit Price',
+        help='Price per unit to be transferred to the generated move lines'
     )
