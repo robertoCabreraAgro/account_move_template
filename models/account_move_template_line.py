@@ -8,6 +8,12 @@ class AccountMoveTemplateLine(models.Model):
     _order = "sequence, id"
     _check_company_auto = True
 
+    company_id = fields.Many2one(
+        comodel_name="res.company",
+        string="Company",
+        related="template_id.company_id",
+        store=True,
+    )
     template_id = fields.Many2one(
         comodel_name="account.move.template",
         string="Move Template",
@@ -15,13 +21,6 @@ class AccountMoveTemplateLine(models.Model):
         index=True,
     )
     name = fields.Char(string="Label")
-    sequence = fields.Integer(required=True, default=10)
-    company_id = fields.Many2one(
-        comodel_name="res.company",
-        string="Company",
-        related="template_id.company_id",
-        store=True,
-    )
     partner_id = fields.Many2one(
         comodel_name="res.partner",
         string="Partner",
@@ -33,13 +32,6 @@ class AccountMoveTemplateLine(models.Model):
         required=True,
         check_company=True,
         domain="[('deprecated', '=', False), ('account_type', '!=', 'off_balance')]",
-    )
-    opt_account_id = fields.Many2one(
-        comodel_name="account.account",
-        string="Account if Negative",
-        help="When amount is negative, use this account instead",
-        check_company=True,
-        domain="[('deprecated', '=', False), ('account_type', '!=', 'off_balance')]",  # Sintaxis mejorada
     )
     product_id = fields.Many2one(
         comodel_name="product.product",
@@ -63,44 +55,14 @@ class AccountMoveTemplateLine(models.Model):
         string="Taxes",
         check_company=True,
     )
-    tax_line_id = fields.Many2one(
-        comodel_name="account.tax",
-        string="Originator Tax", 
-        ondelete="restrict",
-    )
-    tax_repartition_line_id = fields.Many2one(
-        comodel_name="account.tax.repartition.line",
-        string="Tax Repartition Line",
-        ondelete="restrict",
-    )
     move_line_type = fields.Selection(
         selection=[("cr", "Credit"), ("dr", "Debit")],
         string="Direction",
         required=True,
     )
-    type = fields.Selection(
-        selection=[
-            ("input", "User input"),
-            ("computed", "Computed"),
-        ],
-        required=True,
-        default="input",
-    )
-    python_code = fields.Text(
-        string="Formula",
-        help="Python expression to compute the amount of this line. Use 'result' as the variable to store the result.",
-    )
-    note = fields.Char(help="Internal note about this template line")
-    payment_term_id = fields.Many2one(
-        comodel_name="account.payment.term",
-        string="Payment Terms",
-        help="Used to compute the due date of the journal item."
-    )
-    is_refund = fields.Boolean(string="Is a refund?", default=False)
-    analytic_distribution = fields.Json(
-        string='Analytic',
-        copy=True,
-    )
+
+
+
     
     _sql_constraints = [
         (

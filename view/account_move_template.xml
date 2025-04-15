@@ -58,7 +58,6 @@
                         <page id="line_tab" name="line_tab" string="Template Lines">
                             <field name="line_ids" nolabel="1" colspan="2">
                                 <list>
-                                    <field name="sequence"/>
                                     <field name="partner_id" column_invisible="parent.partner_id"/>
                                     <field name="product_id" column_invisible="parent.move_type == 'entry'"/>
                                     <field name="product_uom_id" string="UoM" column_invisible="parent.move_type == 'entry'"/>
@@ -67,14 +66,12 @@
                                     <field name="name"/>
                                     <field name="amount"/>
                                     <field name="move_line_type"/>
-                                    <field name="type"/>
                                     <field name="tax_ids" widget="many2many_tags" options="{'no_create': True}"/>
                                 </list>
                                 <form string="Journal Entry Template Line">
                                     <sheet>
                                         <group name="main">
                                             <group name="main-left">
-                                                <field name="sequence"/>
                                                 <field name="partner_id"/>
                                                 <field name="product_id" invisible="parent.move_type == 'entry'"/>
                                                 <field name="product_uom_id" string="UoM" invisible="parent.move_type == 'entry'"/>
@@ -86,18 +83,6 @@
                                             </group>
                                             <group name="main-right">
                                                 <field name="move_line_type"/>
-                                                <field name="type" widget="radio"/>
-                                                <div name="python_code_help" colspan="2" invisible="type != 'computed'">
-                                                    <p>You can refer to other lines using their sequence number e.g. <i>L1</i> for line with sequence = 1. Examples: </p>
-                                                    <ul>
-                                                        <li>L1 * 0.2</li>
-                                                        <li>L2 - L1</li>
-                                                        <li>L1 + L2 + L3</li>
-                                                        <li>1250</li>
-                                                    </ul>
-                                                </div>
-                                                <field name="python_code" required="type == 'computed'" invisible="type != 'computed'"/>
-                                                <field name="note"/>
                                             </group>
                                         </group>
                                     </sheet>
