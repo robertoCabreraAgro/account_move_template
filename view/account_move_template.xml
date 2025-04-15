@@ -1,31 +1,30 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
+    <!-- Search View -->
     <record id="account_move_template_search" model="ir.ui.view">
         <field name="name">account.move.template.search</field>
         <field name="model">account.move.template</field>
         <field name="arch" type="xml">
             <search string="Journal Entry Template">
-                <filter name="inactive" string="Archived"
-                    domain="[('active','=',False)]" />
-                <field name="name" />
+                <filter name="inactive" string="Archived" domain="[('active','=',False)]"/>
+                <field name="name"/>
             </search>
         </field>
     </record>
 
+    <!-- List View -->
     <record id="account_move_template_list" model="ir.ui.view">
         <field name="name">account.move.template.list</field>
         <field name="model">account.move.template</field>
         <field name="arch" type="xml">
             <list>
-                <field name="name" />
-                <field name="company_id"
-                    widget="many2many_tags"
-                    readonly="True"
-                    groups="base.group_multi_company" />
+                <field name="name"/>
+                <field name="company_id" widget="many2many_tags" readonly="1" groups="base.group_multi_company"/>
             </list>
         </field>
     </record>
 
+    <!-- Form View -->
     <record id="account_move_template_form" model="ir.ui.view">
         <field name="name">account.move.template.form</field>
         <field name="model">account.move.template</field>
@@ -33,86 +32,63 @@
             <form string="Journal Entry Template">
                 <header>
                     <button name="action_move_template_run"
-                        string="Generate Journal Entry"
-                        class="btn-primary" type="object" />
+                            string="Generate Journal Entry"
+                            class="btn-primary"
+                            type="object"/>
                 </header>
                 <sheet>
-                    <widget name="web_ribbon"
-                        title="Archived"
-                        bg_color="bg-danger"
-                        invisible="active" />
+                    <widget name="web_ribbon" title="Archived" bg_color="bg-danger" invisible="active"/>
                     <div class="oe_title">
-                        <label for="name" class="oe_edit_only" />
+                        <label for="name" class="oe_edit_only"/>
                         <h1>
-                            <field name="active" invisible="1" />
-                            <field name="name" />
+                            <field name="active" invisible="1"/>
+                            <field name="name"/>
                         </h1>
                     </div>
                     <group name="main">
                         <group name="main-left">
-                            <field name="partner_id"
-                                options="{'no_open': True, 'no_create': True}" />
-                            <field name="ref" />
-                            <field name="date" 
-                                optional="hide" 
-                                string="Accounting Date" />
-                            <field name="journal_id" 
-                                options='{"no_open":True}' 
-                                optional="hide"/>
-                            <field name="move_type" />
+                            <field name="partner_id" options="{'no_open': True, 'no_create': True}"/>
+                            <field name="ref"/>
+                            <field name="date" optional="hide" string="Accounting Date"/>
+                            <field name="journal_id" options="{'no_open': True}" optional="hide"/>
+                            <field name="move_type"/>
                         </group>
                     </group>
                     <notebook>
                         <page id="line_tab" name="line_tab" string="Template Lines">
-                            <field name="line_ids"
-                                nolabel="1" colspan="2">
+                            <field name="line_ids" nolabel="1" colspan="2">
                                 <list>
-                                    <field name="sequence" />
-                                    <field name="partner_id"
-                                        column_invisible="parent.partner_id" />
-                                    <field name="product_id"
-                                        column_invisible="parent.move_type == 'entry'" />
-                                    <field name="product_uom_id"
-                                        string="UoM"
-                                        column_invisible="parent.move_type == 'entry'" />
-                                    <field name="quantity"
-                                        string="Qty"
-                                        column_invisible="parent.move_type == 'entry'" />
-                                    <field name="account_id" />
-                                    <field name="name" />
-                                    <field name="amount" />
-                                    <field name="move_line_type" />
-                                    <field name="type" />
-                                    <field name="tax_ids" widget="many2many_tags"
-                                        options="{'no_create': True}" />
+                                    <field name="sequence"/>
+                                    <field name="partner_id" column_invisible="parent.partner_id"/>
+                                    <field name="product_id" column_invisible="parent.move_type == 'entry'"/>
+                                    <field name="product_uom_id" string="UoM" column_invisible="parent.move_type == 'entry'"/>
+                                    <field name="quantity" string="Qty" column_invisible="parent.move_type == 'entry'"/>
+                                    <field name="account_id"/>
+                                    <field name="name"/>
+                                    <field name="amount"/>
+                                    <field name="move_line_type"/>
+                                    <field name="type"/>
+                                    <field name="tax_ids" widget="many2many_tags" options="{'no_create': True}"/>
                                 </list>
                                 <form string="Journal Entry Template Line">
                                     <sheet>
                                         <group name="main">
                                             <group name="main-left">
-                                                <field name="sequence" />
-                                                <field name="partner_id" />
-                                                <field name="product_id"
-                                                    invisible="parent.move_type == 'entry'" />
-                                                <field name="product_uom_id"
-                                                    string="UoM"
-                                                    invisible="parent.move_type == 'entry'" />
-                                                <field name="quantity"
-                                                    string="Qty"
-                                                    invisible="parent.move_type == 'entry'" />
-                                                <field name="name" />
-                                                <field name="amount" />
-                                                <field name="account_id" />
-                                                <field name="tax_ids" widget="many2many_tags" />
+                                                <field name="sequence"/>
+                                                <field name="partner_id"/>
+                                                <field name="product_id" invisible="parent.move_type == 'entry'"/>
+                                                <field name="product_uom_id" string="UoM" invisible="parent.move_type == 'entry'"/>
+                                                <field name="quantity" string="Qty" invisible="parent.move_type == 'entry'"/>
+                                                <field name="name"/>
+                                                <field name="amount"/>
+                                                <field name="account_id"/>
+                                                <field name="tax_ids" widget="many2many_tags"/>
                                             </group>
                                             <group name="main-right">
-                                                <field name="move_line_type" />
-                                                <field name="type" widget="radio" />
-                                                <div name="python_code_help" colspan="2"
-                                                    invisible="type != 'computed'">
-                                                    <p>You can refer to other lines using their
-                                                        sequence number e.g. <i>L1</i> for line with
-                                                        sequence = 1. Examples: </p>
+                                                <field name="move_line_type"/>
+                                                <field name="type" widget="radio"/>
+                                                <div name="python_code_help" colspan="2" invisible="type != 'computed'">
+                                                    <p>You can refer to other lines using their sequence number e.g. <i>L1</i> for line with sequence = 1. Examples: </p>
                                                     <ul>
                                                         <li>L1 * 0.2</li>
                                                         <li>L2 - L1</li>
@@ -120,10 +96,8 @@
                                                         <li>1250</li>
                                                     </ul>
                                                 </div>
-                                                <field name="python_code"
-                                                    required="type == 'computed'"
-                                                    invisible="type != 'computed'" />
-                                                <field name="note" />
+                                                <field name="python_code" required="type == 'computed'" invisible="type != 'computed'"/>
+                                                <field name="note"/>
                                             </group>
                                         </group>
                                     </sheet>
@@ -136,15 +110,16 @@
         </field>
     </record>
 
+    <!-- Action -->
     <record id="account_move_template_action" model="ir.actions.act_window">
         <field name="name">Journal Entry Templates</field>
         <field name="res_model">account.move.template</field>
         <field name="view_mode">list,form</field>
     </record>
 
-    <menuitem
-        id="account_move_template_menu"
-        parent="account.account_account_menu"
-        action="account_move_template_action"
-        sequence="300" />
+    <!-- Menu -->
+    <menuitem id="account_move_template_menu"
+              parent="account.account_account_menu"
+              action="account_move_template_action"
+              sequence="300"/>
 </odoo>

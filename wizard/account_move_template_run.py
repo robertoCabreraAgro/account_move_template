@@ -30,7 +30,7 @@ class AccountMoveTemplateRun(models.TransientModel):
     partner_id = fields.Many2one(
         comodel_name="res.partner",
         string="Partner",
-        domain=["|", ("parent_id", "=", False), ("is_company", "=", True)],
+        domain="['|', ('parent_id', '=', False), ('is_company', '=', True)]",
     )
     date = fields.Date(
         required=True,
@@ -49,29 +49,32 @@ class AccountMoveTemplateRun(models.TransientModel):
         inverse_name="wizard_id",
         string="Lines",
     )
-    move_type = fields.Selection([
-        ('entry', 'Journal Entry'),
-        ('out_invoice', 'Customer Invoice'),
-        ('out_refund', 'Customer Credit Note'),
-        ('in_invoice', 'Vendor Bill'),
-        ('in_refund', 'Vendor Credit Note'),
-    ], default='entry', required=True)
+    move_type = fields.Selection(
+        selection=[
+            ('entry', 'Journal Entry'),
+            ('out_invoice', 'Customer Invoice'),
+            ('out_refund', 'Customer Credit Note'),
+            ('in_invoice', 'Vendor Bill'),
+            ('in_refund', 'Vendor Credit Note'),
+        ],
+        default='entry',
+        required=True,
+    )
     price_unit = fields.Float(
         string='Unit Price',
-        help='Price per unit to be transferred to the generated move lines'
+        default=0.0,
     )
    
     def load_lines(self):
         self.ensure_one()
         overwrite_vals = self._get_overwrite_vals()
         amtlro = self.env["account.move.template.line.run"]
+        template_run = self
         template = self.template_id
         tmpl_lines = template.line_ids
         
-        # Limpiar líneas existentes para evitar duplicados
         self.line_ids.unlink()
 
-        # Crear líneas para todos los tipos (input y computed)
         for tmpl_line in tmpl_lines:
             vals = {
                 "wizard_id": self.id,
@@ -89,7 +92,6 @@ class AccountMoveTemplateRun(models.TransientModel):
                 "price_unit": self.price_unit if hasattr(self, 'price_unit') else 0.0,
             }
             
-            # Si hay distribución analítica, añadirla
             if hasattr(tmpl_line, 'analytic_distribution') and tmpl_line.analytic_distribution:
                 vals["analytic_distribution"] = tmpl_line.analytic_distribution
                 
@@ -104,7 +106,7 @@ class AccountMoveTemplateRun(models.TransientModel):
 
         self.write({
             'journal_id': journal.id,
-            "ref": template.ref,
+            "ref": template_run.ref,
             "partner_id": template.partner_id.id or self.partner_id.id,
             "date": template.date or self.date,
         })
@@ -112,10 +114,7 @@ class AccountMoveTemplateRun(models.TransientModel):
         if not self.line_ids:
             return self.generate_move()
 
-        # Aplicar sobreescritura a las líneas visibles
         self._overwrite_line(overwrite_vals)
-
-        # Calcular valores para líneas computadas
         self._compute_line_values()
 
         result = self.env["ir.actions.actions"]._for_xml_id(
@@ -123,7 +122,6 @@ class AccountMoveTemplateRun(models.TransientModel):
         )
         result.update({"res_id": self.id, "context": self.env.context})
 
-        # Limpiar 'amount' del contexto de sobreescritura para la próxima etapa
         for key in overwrite_vals.keys():
             overwrite_vals[key].pop("amount", None)
 
@@ -131,22 +129,18 @@ class AccountMoveTemplateRun(models.TransientModel):
         return result
 
     def _compute_line_values(self):
-        """Calcular valores para líneas computadas basadas en líneas de entrada"""
         self.ensure_one()
         
-        # Obtener valores de entrada
         sequence2amount = {}
         input_lines = self.line_ids.filtered(lambda l: l.template_type == 'input')
         for line in input_lines:
             sequence2amount[line.sequence] = line.amount
             
-        # Calcular valores para líneas computadas
         computed_lines = self.line_ids.filtered(lambda l: l.template_type == 'computed')
         
         if not computed_lines:
             return
             
-        # Necesitamos calcular en orden de secuencia
         for line in computed_lines.sorted(lambda l: l.sequence):
             try:
                 sequence = line.sequence
@@ -158,20 +152,16 @@ class AccountMoveTemplateRun(models.TransientModel):
                     line.amount = amount
                     sequence2amount[sequence] = amount
                     
-                    # Asegurar que el price_unit se mantiene incluso en líneas computadas
                     if hasattr(self, 'price_unit') and self.price_unit:
                         line.price_unit = self.price_unit
             except Exception as e:
-                # Manejar excepciones elegantemente
                 _logger.error("Error al calcular línea %s: %s", line.sequence, str(e))
 
     def generate_move(self):
         self.ensure_one()
         
-        # Vamos a recalcular las líneas computadas para asegurar coherencia
         self._compute_line_values()
         
-        # Mapeo de secuencia → monto ingresado por el usuario
         sequence2amount = {
             wizard_line.sequence: wizard_line.amount
             for wizard_line in self.line_ids
@@ -188,7 +178,6 @@ class AccountMoveTemplateRun(models.TransientModel):
             "line_ids": [],
         }
         
-        # Si hay partner a nivel del wizard, usarlo
         if self.partner_id:
             move_vals["partner_id"] = self.partner_id.id
 
@@ -201,8 +190,6 @@ class AccountMoveTemplateRun(models.TransientModel):
 
         move = self.env["account.move"].create(move_vals)
         
-        # Aquí asignamos directamente el price_unit a todas las líneas
-        # Esto asegura que incluso si no se pasa en _prepare_move_line, se asigna después
         if hasattr(self, 'price_unit') and self.price_unit:
             for move_line in move.line_ids:
                 move_line.price_unit = self.price_unit
@@ -234,11 +221,9 @@ class AccountMoveTemplateRun(models.TransientModel):
             raise ValidationError(
                 _("Overwrite value must be a valid python dict")
             ) from err
-        # First level keys must be L1, L2, ...
         keys = overwrite_vals.keys()
         if list(filter(lambda x: x[:1] != "L" or not x[1:].isdigit(), keys)):
             raise ValidationError(_("Keys must be line sequence i.e. L1, L2, ..."))
-        # Second level keys must be a valid keys
         try:
             if dict(
                 filter(lambda x: set(overwrite_vals[x].keys()) - set(valid_keys), keys)
@@ -282,7 +267,6 @@ class AccountMoveTemplateRun(models.TransientModel):
             "move_line_type": tmpl_line.move_line_type,
             "tax_ids": [Command.set(tmpl_line.tax_ids.ids)],
             "note": tmpl_line.note,
-            # Asegurar que price_unit se asigna a las líneas del wizard
             "price_unit": self.price_unit if hasattr(self, 'price_unit') and self.price_unit else 0.0,
         }
         return vals
@@ -318,7 +302,6 @@ class AccountMoveTemplateRun(models.TransientModel):
                 vals[key] = 0
 
     def _prepare_move_line(self, line, amount):
-        """Preparar valores para línea del asiento desde la línea del wizard"""
         date_maturity = False
         if hasattr(line, 'payment_term_id') and line.payment_term_id:
             pterm_list = line.payment_term_id.compute(value=1, date_ref=self.date)
@@ -334,7 +317,6 @@ class AccountMoveTemplateRun(models.TransientModel):
             "date_maturity": date_maturity or self.date,
         }
         
-        # Transferir el price_unit si existe en la línea del wizard
         if hasattr(line, 'price_unit') and line.price_unit:
             values["price_unit"] = line.price_unit
         elif hasattr(self, 'price_unit') and self.price_unit:
@@ -361,7 +343,6 @@ class AccountMoveTemplateRun(models.TransientModel):
         if getattr(line, 'analytic_distribution', False):
             values["analytic_distribution"] = line.analytic_distribution
 
-        # Aplicar sobreescritura desde contexto
         overwrite = self._context.get("overwrite", {})
         move_line_vals = overwrite.get(f"L{line.sequence}", {})
         values.update(move_line_vals)
@@ -372,7 +353,7 @@ class AccountMoveTemplateRun(models.TransientModel):
 class AccountMoveTemplateLineRun(models.TransientModel):
     _name = "account.move.template.line.run"
     _description = "Wizard Lines to generate move from template"
-    _order = "sequence, id"  # Añadir orden para asegurar cálculos ordenados
+    _order = "sequence, id"
 
     wizard_id = fields.Many2one(
         comodel_name="account.move.template.run",
@@ -380,55 +361,76 @@ class AccountMoveTemplateLineRun(models.TransientModel):
     )
     company_id = fields.Many2one(related="wizard_id.company_id")
     company_currency_id = fields.Many2one(
-        related="wizard_id.company_id.currency_id", string="Company Currency"
+        related="wizard_id.company_id.currency_id", 
+        string="Company Currency"
     )
-    name = fields.Char()  # Eliminar readonly para permitir edición
+    name = fields.Char()
     sequence = fields.Integer(required=True)
     move_line_type = fields.Selection(
-        [("cr", "Credit"), ("dr", "Debit")],
+        selection=[("cr", "Credit"), ("dr", "Debit")],
         required=True,
         readonly=True,
         string="Direction",
     )
-    partner_id = fields.Many2one("res.partner", string="Partner")  # Eliminar readonly
-    payment_term_id = fields.Many2one(
-        "account.payment.term", string="Payment Terms"
+    partner_id = fields.Many2one(
+        comodel_name="res.partner", 
+        string="Partner"
     )
-    account_id = fields.Many2one("account.account", required=True)  # Eliminar readonly
-    tax_ids = fields.Many2many("account.tax", string="Taxes", readonly=True)
+    payment_term_id = fields.Many2one(
+        comodel_name="account.payment.term", 
+        string="Payment Terms"
+    )
+    account_id = fields.Many2one(
+        comodel_name="account.account", 
+        required=True
+    )
+    tax_ids = fields.Many2many(
+        comodel_name="account.tax", 
+        string="Taxes", 
+        readonly=True
+    )
     tax_line_id = fields.Many2one(
-        "account.tax", string="Originator Tax", ondelete="restrict", readonly=True
+        comodel_name="account.tax", 
+        string="Originator Tax", 
+        ondelete="restrict", 
+        readonly=True
     )
     tax_repartition_line_id = fields.Many2one(
-        "account.tax.repartition.line",
+        comodel_name="account.tax.repartition.line",
         string="Tax Repartition Line",
         readonly=True,
     )
-    amount = fields.Monetary(required=True, currency_field="company_currency_id")
+    amount = fields.Monetary(
+        required=True, 
+        currency_field="company_currency_id"
+    )
     note = fields.Char()
-    is_refund = fields.Boolean(string="Is a refund?", readonly=True)
+    is_refund = fields.Boolean(
+        string="Is a refund?", 
+        readonly=True
+    )
     analytic_distribution = fields.Json('Analytic')
     analytic_precision = fields.Integer(
         store=False,
         default=lambda self: self.env['decimal.precision'].precision_get("Percentage Analytic"),
     )
-    # Nuevos campos para gestionar el cálculo
     template_type = fields.Selection(
-        [
+        selection=[
             ("input", "User input"),
             ("computed", "Computed"),
         ],
         string="Template Type",
         readonly=True,
     )
-    python_code = fields.Text(string="Formula", readonly=True)
-
+    python_code = fields.Text(
+        string="Formula", 
+        readonly=True
+    )
     product_id = fields.Many2one(
         comodel_name="product.product",
         string="Product",
     )
-
     price_unit = fields.Float(
         string='Unit Price',
-        help='Price per unit to be transferred to the generated move lines'
+        default=0.0,
     )
