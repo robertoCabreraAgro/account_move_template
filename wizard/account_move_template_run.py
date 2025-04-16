@@ -1,4 +1,3 @@
-# wizard/account_move_template_run.py
 from ast import literal_eval
 import logging
 
@@ -20,7 +19,7 @@ class AccountMoveTemplateRun(models.TransientModel):
     template_id = fields.Many2one(
         comodel_name="account.move.template",
         required=True,
-        domain="[('company_id', '=', company_id)]",
+        domain="['|', ('company_id', '=', company_id), ('target_company_id', '=', company_id)]",
     )
     journal_id = fields.Many2one(
         comodel_name="account.journal",
@@ -74,6 +73,24 @@ class AccountMoveTemplateRun(models.TransientModel):
         tmpl_lines = template.line_ids
         
         self.line_ids.unlink()
+
+        # Asegurar que estamos usando la compañía correcta
+        # Si el template tiene target_company_id, usamos esa
+        target_company = template.target_company_id if hasattr(template, 'target_company_id') and template.target_company_id else template.company_id
+        if target_company and self.company_id != target_company:
+            self.company_id = target_company.id
+            
+            # Asegurar que el diario es válido para la compañía
+            if self.journal_id and self.journal_id.company_id != target_company:
+                if template.journal_id and template.journal_id.company_id == target_company:
+                    self.journal_id = template.journal_id.id
+                else:
+                    domain = [('company_id', '=', target_company.id), ('type', '=', 'general')]
+                    journal = self.env['account.journal'].search(domain, limit=1)
+                    if journal:
+                        self.journal_id = journal.id
+                    else:
+                        self.journal_id = False
 
         for tmpl_line in tmpl_lines:
             vals = {
@@ -169,11 +186,15 @@ class AccountMoveTemplateRun(models.TransientModel):
 
         company_cur = self.company_id.currency_id
 
+        # Verificar que estamos usando la compañía correcta para el asiento
+        template = self.template_id
+        target_company = template.target_company_id if hasattr(template, 'target_company_id') and template.target_company_id else self.company_id
+
         move_vals = {
             "ref": self.ref,
             "journal_id": self.journal_id.id,
             "date": self.date,
-            "company_id": self.company_id.id,
+            "company_id": target_company.id,
             "move_type": self.move_type,
             "line_ids": [],
         }

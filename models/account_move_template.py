@@ -16,11 +16,19 @@ class AccountMoveTemplate(models.Model):
         default=lambda self: self.env.company,
         required=True,
     )
+    # Nueva compañía destino para la creación de asientos
+    target_company_id = fields.Many2one(
+        comodel_name="res.company",
+        string="Target Company",
+        help="If set, journal entries will be created in this company, "
+             "regardless of the workflow company or user's company",
+        default=lambda self: self.env.company,
+    )
     journal_id = fields.Many2one(
         comodel_name="account.journal",
         string="Journal",
         check_company=True,
-        domain="[('company_id', '=', company_id)]",
+        domain="[('company_id', '=', target_company_id)]",
     )
     ref = fields.Char(string="Reference", help="Internal reference or note")
     line_ids = fields.One2many(
@@ -66,6 +74,24 @@ class AccountMoveTemplate(models.Model):
         default.update(name=_("%s (copy)") % self.name)
         return super().copy(default)
     
+    @api.onchange('target_company_id')
+    def _onchange_target_company_id(self):
+        """Actualiza el diario cuando cambia la compañía destino"""
+        for template in self:
+            if template.target_company_id and (not template.journal_id or 
+                                              template.journal_id.company_id != template.target_company_id):
+                if template.move_type in ('out_invoice', 'out_refund'):
+                    journal_type = 'sale'
+                elif template.move_type in ('in_invoice', 'in_refund'):
+                    journal_type = 'purchase'
+                else:
+                    journal_type = 'general'
+                    
+                domain = [('type', '=', journal_type), ('company_id', '=', template.target_company_id.id)]
+                journal = self.env['account.journal'].search(domain, limit=1)
+                if journal:
+                    template.journal_id = journal.id
+    
     @api.onchange('move_type')
     def _onchange_move_type(self):
         """Update journal based on move_type"""
@@ -77,7 +103,8 @@ class AccountMoveTemplate(models.Model):
             else:
                 journal_type = 'general'
                 
-            domain = [('type', '=', journal_type), ('company_id', '=', template.company_id.id)]
+            target_company = template.target_company_id or template.company_id
+            domain = [('type', '=', journal_type), ('company_id', '=', target_company.id)]
             journal = self.env['account.journal'].search(domain, limit=1)
             if journal:
                 template.journal_id = journal.id
@@ -85,6 +112,8 @@ class AccountMoveTemplate(models.Model):
     def action_move_template_run(self):
         """Open wizard to create move from template"""
         self.ensure_one()
+        # Usar la compañía destino si está definida, sino usar la compañía del template
+        target_company = self.target_company_id or self.company_id
         return {
             "type": "ir.actions.act_window",
             "name": _("Create Entry from Template"),
@@ -93,7 +122,7 @@ class AccountMoveTemplate(models.Model):
             "target": "new",
             "context": {
                 "default_template_id": self.id,
-                "default_company_id": self.company_id.id,
+                "default_company_id": target_company.id,
                 "default_journal_id": self.journal_id.id,
                 "default_partner_id": self.partner_id.id,
                 "default_move_type": self.move_type,
@@ -123,7 +152,7 @@ class AccountMoveTemplate(models.Model):
                 except Exception as e:
                     if "unexpected EOF" in str(e):
                         raise UserError(_(
-                            "Impossible to compute formula for line with sequence %(sequence)s "
+                            "Impossible to compute the formula for line with sequence %(sequence)s "
                             "(formula: %(code)s). Check that the lines used in the formula "
                             "exist and have a lower sequence than the current line.",
                             sequence=sequence,

@@ -8,6 +8,13 @@
             <search string="Journal Entry Template">
                 <filter name="inactive" string="Archived" domain="[('active','=',False)]"/>
                 <field name="name"/>
+                <field name="company_id"/>
+                <field name="target_company_id"/>
+                <separator/>
+                <group expand="0" string="Group By">
+                    <filter string="Company" name="company_groupby" domain="[]" context="{'group_by': 'company_id'}"/>
+                    <filter string="Target Company" name="target_company_groupby" domain="[]" context="{'group_by': 'target_company_id'}"/>
+                </group>
             </search>
         </field>
     </record>
@@ -19,7 +26,8 @@
         <field name="arch" type="xml">
             <list>
                 <field name="name"/>
-                <field name="company_id" widget="many2many_tags" readonly="1" groups="base.group_multi_company"/>
+                <field name="company_id" widget="many2many_tags" readonly="1"/>
+                <field name="target_company_id" widget="many2many_tags"/>
             </list>
         </field>
     </record>
@@ -47,10 +55,14 @@
                     </div>
                     <group name="main">
                         <group name="main-left">
+                            <field name="company_id" options="{'no_create': True}"/>
+                            <field name="target_company_id" options="{'no_create': True}"/>
                             <field name="partner_id" options="{'no_open': True, 'no_create': True}"/>
                             <field name="ref"/>
                             <field name="date" optional="hide" string="Accounting Date"/>
-                            <field name="journal_id" options="{'no_open': True}" optional="hide"/>
+                        </group>
+                        <group name="main-right">
+                            <field name="journal_id" options="{'no_open': True}" domain="[('company_id', '=', target_company_id)]"/>
                             <field name="move_type"/>
                         </group>
                     </group>
@@ -58,6 +70,7 @@
                         <page id="line_tab" name="line_tab" string="Template Lines">
                             <field name="line_ids" nolabel="1" colspan="2">
                                 <list>
+                                    <field name="sequence" widget="handle"/>
                                     <field name="partner_id" column_invisible="parent.partner_id"/>
                                     <field name="product_id" column_invisible="parent.move_type == 'entry'"/>
                                     <field name="product_uom_id" string="UoM" column_invisible="parent.move_type == 'entry'"/>
