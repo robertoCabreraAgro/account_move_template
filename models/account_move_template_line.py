@@ -68,14 +68,6 @@ class AccountMoveTemplateLine(models.Model):
         help="When creating a new journal item an account having this prefix"
              "will be looked for",
     )
-    move_line_type = fields.Selection(
-        [
-            ("cr", "Credit"),
-            ("dr", "Debit")
-        ],
-        string="Direction",
-        required=True,
-    )
     type = fields.Selection(
         [
             ("input", "User input"),

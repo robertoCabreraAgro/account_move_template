@@ -26,8 +26,8 @@
         <field name="arch" type="xml">
             <list>
                 <field name="name"/>
-                <field name="company_id" widget="many2many_tags" readonly="1" groups="base.group_multi_company"/>
-                <field name="target_company_id" widget="many2many_tags" groups="base.group_multi_company"/>
+                <field name="company_id"  readonly="1" groups="base.group_multi_company"/>
+                <field name="target_company_id"  groups="base.group_multi_company"/>
             </list>
         </field>
     </record>
@@ -72,14 +72,14 @@
                                 <list>
                                     <field name="sequence" widget="handle"/>
                                     <field name="partner_id" column_invisible="parent.partner_id"/>
-                                    <field name="product_id" column_invisible="parent.move_type == 'entry'"/>
-                                    <field name="product_uom_id" string="UoM" column_invisible="parent.move_type == 'entry'"/>
-                                    <field name="quantity" string="Qty" column_invisible="parent.move_type == 'entry'"/>
+                                    <field name="product_id" />
+                                    <field name="product_uom_id" string="UoM" />
+                                    <field name="quantity" string="Qty" />
                                     <field name="account_id"/>
                                     <field name="name"/>
                                     <field name="amount"/>
                                     <field name="move_line_type"/>
-                                    <field name="tax_ids" widget="many2many_tags" options="{'no_create': True}"/>
+                                    <field name="tax_ids"  options="{'no_create': True}"/>
                                 </list>
                                 <form string="Journal Entry Template Line">
                                     <sheet>
@@ -92,7 +92,7 @@
                                                 <field name="name"/>
                                                 <field name="amount"/>
                                                 <field name="account_id"/>
-                                                <field name="tax_ids" widget="many2many_tags"/>
+                                                <field name="tax_ids" />
                                             </group>
                                             <group name="main-right">
                                                 <field name="move_line_type"/>
