@@ -11,8 +11,8 @@
     "data": [
         "security/ir_rule.xml",
         "security/ir.model.access.csv",
-        "wizard/account_move_template_run_view.xml",
-        "view/account_move_template.xml",
+        "views/account_move_template_run_views.xml",
+        "views/account_move_template_views.xml",
     ],
     "installable": True,
 }

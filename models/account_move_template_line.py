@@ -5,10 +5,9 @@ from odoo.exceptions import ValidationError
 class AccountMoveTemplateLine(models.Model):
     _name = "account.move.template.line"
     _description = "Journal Item Template"
-    _order = "id"
+    _order = "sequence, id"
     _check_company_auto = True
 
-    
     company_id = fields.Many2one(
         comodel_name="res.company",
         string="Company",
@@ -62,7 +61,31 @@ class AccountMoveTemplateLine(models.Model):
         required=True,
     )
 
-
+    name = fields.Char(string="Label")
+    sequence = fields.Integer(required=True)
+    account_prefix = fields.Char(
+        string='Accounts Prefix',
+        help="When creating a new journal item an account having this prefix"
+             "will be looked for",
+    )
+    move_line_type = fields.Selection(
+        [
+            ("cr", "Credit"),
+            ("dr", "Debit")
+        ],
+        string="Direction",
+        required=True,
+    )
+    type = fields.Selection(
+        [
+            ("input", "User input"),
+            ("computed", "Computed"),
+        ],
+        required=True,
+        default="input",
+    )
+    python_code = fields.Text(string="Formula")
+    note = fields.Char()
 
     
     _sql_constraints = [
@@ -72,6 +95,15 @@ class AccountMoveTemplateLine(models.Model):
             "The sequence of the line must be unique per template!",
         ),
     ]
+
+    @api.constrains("type", "python_code")
+    def _check_python_code(self):
+        for line in self:
+            if line.type == "computed" and not line.python_code:
+                raise ValidationError(
+                    _("Python Code must be set for computed line with sequence %d.")
+                    % line.sequence
+                )
 
     @api.depends("product_id")
     def _compute_product_uom_id(self):
