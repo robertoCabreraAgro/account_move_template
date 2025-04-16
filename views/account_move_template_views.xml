@@ -8,8 +8,8 @@
             <search string="Journal Entry Template">
                 <filter name="inactive" string="Archived" domain="[('active','=',False)]"/>
                 <field name="name"/>
-                <field name="company_id"/>
-                <field name="target_company_id"/>
+                <field name="company_id" groups="base.group_multi_company"/>
+                <field name="target_company_id" groups="base.group_multi_company"/>
                 <separator/>
                 <group expand="0" string="Group By">
                     <filter string="Company" name="company_groupby" domain="[]" context="{'group_by': 'company_id'}"/>
@@ -26,8 +26,8 @@
         <field name="arch" type="xml">
             <list>
                 <field name="name"/>
-                <field name="company_id" widget="many2many_tags" readonly="1"/>
-                <field name="target_company_id" widget="many2many_tags"/>
+                <field name="company_id" widget="many2many_tags" readonly="1" groups="base.group_multi_company"/>
+                <field name="target_company_id" widget="many2many_tags" groups="base.group_multi_company"/>
             </list>
         </field>
     </record>
@@ -49,14 +49,14 @@
                     <div class="oe_title">
                         <label for="name" class="oe_edit_only"/>
                         <h1>
-                            <field name="active" invisible="1"/>
+                            <field name="active" invisible="True"/>
                             <field name="name"/>
                         </h1>
                     </div>
                     <group name="main">
                         <group name="main-left">
-                            <field name="company_id" options="{'no_create': True}"/>
-                            <field name="target_company_id" options="{'no_create': True}"/>
+                            <field name="company_id" options="{'no_create': True}" groups="base.group_multi_company"/>
+                            <field name="target_company_id" options="{'no_create': True}" groups="base.group_multi_company"/>
                             <field name="partner_id" options="{'no_open': True, 'no_create': True}"/>
                             <field name="ref"/>
                             <field name="date" optional="hide" string="Accounting Date"/>
@@ -86,9 +86,9 @@
                                         <group name="main">
                                             <group name="main-left">
                                                 <field name="partner_id"/>
-                                                <field name="product_id" invisible="parent.move_type == 'entry'"/>
-                                                <field name="product_uom_id" string="UoM" invisible="parent.move_type == 'entry'"/>
-                                                <field name="quantity" string="Qty" invisible="parent.move_type == 'entry'"/>
+                                                <field name="product_id" />
+                                                <field name="product_uom_id" string="UoM" />
+                                                <field name="quantity" string="Qty" />
                                                 <field name="name"/>
                                                 <field name="amount"/>
                                                 <field name="account_id"/>
