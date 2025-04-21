@@ -17,7 +17,16 @@ class AccountMoveTemplateLine(models.Model):
         ondelete="cascade",
         index=True,
     )
-    move_type = fields.Selection(related="template_id.move_type")
+    display_type = fields.Selection(
+        selection=[
+            ('product', 'Product'),
+            ('payment_term', 'Payment Term'),
+            ('line_section', 'Section'),
+            ('line_note', 'Note'),
+        ],
+        required=True,
+        default="product",
+    )
     partner_id = fields.Many2one(
         comodel_name="res.partner",
         string="Partner",
@@ -74,11 +83,6 @@ class AccountMoveTemplateLine(models.Model):
     balance = fields.Float(
         string="Balance",
         digits="Product Price",
-    )
-    tax_ids = fields.Many2many(
-        comodel_name="account.tax",
-        string="Taxes",
-        check_company=True,
     )
     python_code = fields.Text(string="Formula")
     note = fields.Char()

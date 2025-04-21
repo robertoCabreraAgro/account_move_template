@@ -33,23 +33,32 @@ class AccountMoveTemplateLineRun(models.TransientModel):
         comodel_name="res.partner",
         string="Partner",
     )
+    account_id = fields.Many2one(
+        comodel_name="account.account",
+    )
     product_id = fields.Many2one(
         comodel_name="product.product",
         string="Product",
     )
+    product_uom_id = fields.Many2one(
+        comodel_name="uom.uom",
+        string="Unit of Measure",
+    )
+    quantity = fields.Float(
+        string="Quantity",
+        digits="Product Unit of Measure",
+    )
     price_unit = fields.Float(
         string="Unit Price",
-        default=0.0,
+        digits="Product Price",
     )
-    amount = fields.Float()
-    account_id = fields.Many2one(
-        comodel_name="account.account",
+    discount = fields.Float(
+        string="Discount (%)",
+        digits="Discount",
     )
-    tax_ids = fields.Many2many(
-        comodel_name="account.tax",
-        string="Taxes",
-        readonly=True,
+    balance = fields.Float(
+        string="Balance",
+        digits="Product Price",
     )
     python_code = fields.Text(string="Formula", readonly=True)
     note = fields.Char()
-    is_refund = fields.Boolean(string="Is a refund?", readonly=True)

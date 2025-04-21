@@ -8,7 +8,8 @@
             <search string="Journal Entry Template">
                 <field name="name" />
                 <field name="company_id" groups="base.group_multi_company" />
-                <filter name="inactive" string="Archived" domain="[('active','=',False)]" />
+                <filter name="inactive" string="Archived"
+                    domain="[('active','=',False)]" />
                 <separator />
                 <group expand="0" string="Group By">
                     <filter name="company_groupby" string="Company"
@@ -66,21 +67,43 @@
                     </group>
                     <notebook>
                         <page id="line_tab" name="line_tab" string="Template Lines">
-                            <field name="line_ids" nolabel="1" colspan="2">
-                                <list>
-                                    <field name="move_type" column_invisible="1" />
+                            <field name="line_ids"
+                                widget="product_label_section_and_note_field_o2m">
+                                <list string="Journal Items" editable="bottom"
+                                    default_order="sequence, id">
+                                    <control>
+                                        <create name="add_line_control" string="Add a line" />
+                                        <create name="add_section_control" string="Add a section"
+                                            context="{'default_display_type': 'line_section'}" />
+                                        <create name="add_note_control" string="Add a note"
+                                            context="{'default_display_type': 'line_note'}" />
+                                    </control>
                                     <field name="sequence" widget="handle" />
-                                    <field name="partner_id" column_invisible="parent.partner_id" />
-                                    <field name="product_id" />
-                                    <field name="product_uom_id" string="UoM" />
-                                    <field name="quantity" string="Qty" />
+                                    <field name="partner_id"
+                                        column_invisible="parent.partner_id or parent.move_type != 'entry'" />
+                                    <field name="product_id"
+                                        widget="product_label_section_and_note_field"
+                                        column_invisible="parent.move_type == 'entry'" />
+                                    <field name="name" widget="section_and_note_text" />
                                     <field name="account_id" />
                                     <field name="account_code" />
-                                    <field name="name" />
-                                    <field name="balance" />
-                                    <field name="tax_ids" options="{'no_create': True}" />
+                                    <field name="analytic_distribution"
+                                        widget="analytic_distribution"
+                                        string="Analytic"
+                                        groups="analytic.group_analytic_accounting" />
+                                    <field name="quantity" string="Qty"
+                                        column_invisible="parent.move_type == 'entry'" />
+                                    <field name="product_uom_id" string="UoM"
+                                        column_invisible="parent.move_type == 'entry'" />
+                                    <field name="price_unit" string="Price"
+                                        column_invisible="parent.move_type == 'entry'" />
+                                    <field name="discount" width="50px" string="Disc.%"
+                                        optional="hide"
+                                        column_invisible="parent.move_type == 'entry'" />
+                                    <field name="balance"
+                                        column_invisible="parent.move_type != 'entry'" />
                                 </list>
-<!--                                 <form string="Journal Entry Template Line">
+                                <!--                                 <form string="Journal Entry Template Line">
                                     <sheet>
                                         <group name="main">
                                             <group name="main-left">
@@ -92,7 +115,6 @@
                                                 <field name="balance" />
                                                 <field name="account_id" />
                                                 <field name="account_code" />
-                                                <field name="tax_ids" />
                                             </group>
                                             <group name="main-right">
                                                 <field name="move_type" invisible="1" />
@@ -100,7 +122,8 @@
                                         </group>
                                     </sheet>
                                 </form>
- -->                            </field>
+ -->
+                            </field>
                         </page>
                         <page name="other_info" string="Other Information">
                             <group>
@@ -108,7 +131,7 @@
                                 </group>
                                 <group>
                                     <field name="company_id" options="{'no_create': True}"
-                                    groups="base.group_multi_company" />
+                                        groups="base.group_multi_company" />
                                 </group>
                             </group>
                         </page>

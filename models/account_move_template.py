@@ -40,10 +40,10 @@ class AccountMoveTemplate(models.Model):
     move_type = fields.Selection(
         selection=[
             ("entry", "Journal Entry"),
-            ("out_invoice", "Customer Invoice"),
-            ("out_refund", "Customer Credit Note"),
             ("in_invoice", "Vendor Bill"),
             ("in_refund", "Vendor Credit Note"),
+            ("out_invoice", "Customer Invoice"),
+            ("out_refund", "Customer Credit Note"),
         ],
         default="entry",
         required=True,
@@ -53,7 +53,6 @@ class AccountMoveTemplate(models.Model):
         string="Reference",
         help="Internal reference or note",
     )
-    use_product = fields.Boolean(default=False)
     line_ids = fields.One2many(
         comodel_name="account.move.template.line",
         inverse_name="template_id",
@@ -93,7 +92,7 @@ class AccountMoveTemplate(models.Model):
                 "date": fields.Date.context_today(self),
             }
         )
-        wizard._onchange_template_id()
+        wizard.load_lines()
         return {
             "name": _("Create Entry from Template"),
             "type": "ir.actions.act_window",
