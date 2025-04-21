@@ -19,9 +19,7 @@ class TestAccountMoveTemplate(TransactionCase):
 
     def _chart_of_accounts_create(self, company, chart):
         _logger.debug("Creating chart of account")
-        self.env.user.write(
-            {"company_id": company.id}
-        )
+        self.env.user.write({"company_id": company.id})
         self.with_context(company_id=company.id, force_company=company.id)
         wizard = self.env["wizard.multi.charts.accounts"].create(
             {
