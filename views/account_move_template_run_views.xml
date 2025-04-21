@@ -10,7 +10,6 @@
                     <field name="company_id" groups="base.group_multi_company"/>
                     <field name="partner_id"/>
                     <field name="date"/>
-                    <field name="journal_id"/>
                     <field name="ref"/>
                     <field name="move_type"/>
                     <field name="price_unit"/>
