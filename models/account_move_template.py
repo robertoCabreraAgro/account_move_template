@@ -58,6 +58,21 @@ class AccountMoveTemplate(models.Model):
         inverse_name="template_id",
         string="Lines",
     )
+    is_payment = fields.Boolean(
+        string="Is Payment",
+        help="If checked, this template will generate a payment instead of a journal entry",
+        default=False,
+    )
+    payment_type = fields.Selection(
+        selection=[("outbound", "Send Money"), ("inbound", "Receive Money")],
+        string="Payment Type",
+        help="Determines the flow of the payment (outbound or inbound)",
+    )
+    partner_type = fields.Selection(
+        selection=[("customer", "Customer"), ("supplier", "Vendor")],
+        string="Partner Type",
+        help="Determines whether the payment is for a customer or vendor",
+    )
 
     _sql_constraints = [
         (
@@ -90,9 +105,44 @@ class AccountMoveTemplate(models.Model):
                 "template_id": self.id,
                 "partner_id": self.partner_id.id,
                 "date": fields.Date.context_today(self),
+                "ref": self.ref,
             }
         )
         wizard.load_lines()
+        return {
+            "name": _("Create Entry from Template"),
+            "type": "ir.actions.act_window",
+            "res_model": "account.move.template.run",
+            "view_mode": "form",
+            "target": "new",
+            "res_id": wizard.id,
+        }
+
+    def generate_journal_entry(self):
+        self.ensure_one()
+
+        context = self.env.context
+        partner_id = context.get("default_partner_id") or self.partner_id.id
+        date = context.get("default_date") or fields.Date.context_today(self)
+        ref = context.get("default_ref") or self.ref
+        amount = context.get("amount")  # si aplica en pagos automáticos
+        overwrite = context.get("overwrite")
+
+        wizard_vals = {
+            "template_id": self.id,
+            "partner_id": partner_id,
+            "date": date,
+            "ref": ref,
+        }
+
+        if amount and self.is_payment:
+            wizard_vals["payment_amount"] = amount
+        if overwrite:
+            wizard_vals["overwrite"] = overwrite
+
+        wizard = self.env["account.move.template.run"].create(wizard_vals)
+        wizard.load_lines()
+
         return {
             "name": _("Create Entry from Template"),
             "type": "ir.actions.act_window",

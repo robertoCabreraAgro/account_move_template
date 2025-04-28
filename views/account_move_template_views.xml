@@ -54,19 +54,27 @@
                     </div>
                     <group name="main">
                         <group name="main-left">
+                            <field name="is_payment" widget="boolean_button"
+                                options="{'terminology': 'payment'}" />
                             <field name="partner_id" options="{'no_open': True, 'no_create': True}" />
                             <field name="ref" />
-                            <field name="active" invisible="True" />
+                            <field name="active" invisible="1" />
+                            <field name="payment_type" invisible="not is_payment"
+                                required="is_payment" />
+                            <field name="partner_type" invisible="not is_payment"
+                                required="is_payment" />
                         </group>
                         <group name="main-right">
                             <field name="journal_id" />
                             <field name="journal_code" />
                             <field name="move_type" />
-                            <field name="invoice_payment_term_id" />
+                            <field name="invoice_payment_term_id"
+                                invisible="is_payment" />
                         </group>
                     </group>
                     <notebook>
-                        <page id="line_tab" name="line_tab" string="Template Lines">
+                        <page id="line_tab" name="line_tab" string="Template Lines"
+                            invisible="is_payment">
                             <field name="line_ids"
                                 widget="product_label_section_and_note_field_o2m">
                                 <list string="Journal Items" editable="bottom"
@@ -147,7 +155,8 @@
         <field name="view_mode">list,form</field>
     </record>
 
-    <menuitem id="account_move_template_menu"
+    <menuitem
+        id="account_move_template_menu"
         parent="account.account_account_menu"
         action="account_move_template_action"
         sequence="300" />

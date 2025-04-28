@@ -19,10 +19,10 @@ class AccountMoveTemplateLine(models.Model):
     )
     display_type = fields.Selection(
         selection=[
-            ('product', 'Product'),
-            ('payment_term', 'Payment Term'),
-            ('line_section', 'Section'),
-            ('line_note', 'Note'),
+            ("product", "Product"),
+            ("payment_term", "Payment Term"),
+            ("line_section", "Section"),
+            ("line_note", "Note"),
         ],
         required=True,
         default="product",
